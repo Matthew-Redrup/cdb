@@ -3,8 +3,9 @@ SRC = $(wildcard src/*.c)
 OBJ = $(patsubst src/%.c, obj/%.o, $(SRC))
 
 run: clean default
-	./$(TARGET) -f ./mynewdb.db -n 
-	./$(TARGET) -f ./mynewdb.db -a "Timmy H.,123 Sheshire Ln.,120"
+	./$(TARGET) -f ./mynewdb.db -n
+	./$(TARGET) -f ./mynewdb.db
+	# ./$(TARGET) -f ./mynewdb.db -a "Timmy H.,123 Sheshire Ln.,120"
 
 default: $(TARGET)
 
@@ -13,10 +14,13 @@ clean:
 	rm -f bin/*
 	rm -f *.db
 
-$(TARGET): $(OBJ)
+obj bin:
+	mkdir -p $@
+
+$(TARGET): $(OBJ) | bin
 	gcc -o $@ $?
 
-obj/%.o : src/%.c
+obj/%.o : src/%.c | obj
 	gcc -c $< -o $@ -Iinclude
 
 
