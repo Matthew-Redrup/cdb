@@ -15,60 +15,78 @@ void list_employees(struct dbheader_t *dbhdr, struct employee_t *employees) {
 }
 
 int add_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *addstring) {
+	printf("%s\n", addstring);
 
+	char *name = strtok(addstring, ",");
+
+	char *addr = strtok(NULL, ",");
+
+	char *hours = strtok(NULL, ",");
+
+	printf("%s %s %s\n", name, addr, hours);
+
+	
+	strncpy(employees[dbhdr->count-1].name, name, sizeof(employees[dbhdr->count-1].name));
+	strncpy(employees[dbhdr->count-1].address, addr, sizeof(employees[dbhdr->count-1].address));
+
+	employees[dbhdr->count-1].hours = atoi(hours);
+	
+
+	return STATUS_SUCCESS;
 }
 
 int read_employees(int fd, struct dbheader_t *dbhdr, struct employee_t **employeesOut) {
-    if (fd < 0) {
-        printf("Got a bad FD from the user\n");
-        return STATUS_ERROR;
-    }
+	if (fd < 0) {
+		printf("Got a bad FD from the user\n");
+		return STATUS_ERROR;
+	}
 
-    struct employee_t *employees = calloc(dbhdr->count, sizeof(struct employee_t));
-    if (employees == NULL) {
-        printf("Malloc failed to create employees array\n");
-        return STATUS_ERROR;
-    }
 
-    ssize_t n = read(fd, employees, dbhdr->count * sizeof(struct employee_t));
-    if (n != (ssize_t)(dbhdr->count * sizeof(struct employee_t))) {
-        perror("read");
-        free(employees);
-        return STATUS_ERROR;
-    }
+	int count = dbhdr->count;
 
-    for (int i = 0; i < dbhdr->count; i++) {
-        employees[i].name = ntohs(employees[i].name);
-        employees[i].address = ntohs(employees[i].address);
-        employees[i].hours = ntohs(employees[i].hours);
-    }
+	struct employee_t *employees = calloc(count, sizeof(struct employee_t));
+	if (employees == NULL) {
+		printf("Malloc failed\n");
+		return STATUS_ERROR;
+	}
 
-    *employeesOut = employees;
-    return STATUS_SUCCESS;
+	read(fd, employees, count*sizeof(struct employee_t));
+
+	int i = 0;
+	for (; i < count; i++) {
+		employees[i].hours = ntohl(employees[i].hours);
+	}
+
+	*employeesOut = employees;
+	return STATUS_SUCCESS;
+
 }
 
 int output_file(int fd, struct dbheader_t *dbhdr, struct employee_t *employees) {
-    if (fd < 0) {
-        printf("Got a bad FD from the user\n");
-        return STATUS_ERROR;
-    }
+	if (fd < 0) {
+		printf("Got a bad FD from the user\n");
+		return STATUS_ERROR;
+	}
 
-    dbhdr->magic = htonl(dbhdr->magic);
-    dbhdr->filesize = htonl(dbhdr->filesize);
-    dbhdr->count = htons(dbhdr->count);
-    dbhdr->version = htons(dbhdr->version);
+	int realcount = dbhdr->count;
 
-    for (int i = 0; i < dbhdr->count; i++) {
-        employees[i].name = htons(employees[i].name);
-        employees[i].address = htons(employees[i].address);
-        employees[i].hours = htons(employees[i].hours);
-    }
+	dbhdr->magic = htonl(dbhdr->magic);
+	dbhdr->filesize = htonl(sizeof(struct dbheader_t) + (sizeof(struct employee_t) * realcount));
+	dbhdr->count = htons(dbhdr->count);
+	dbhdr->version = htons(dbhdr->version);
 
-    lseek(fd, 0, SEEK_SET);
-    write(fd, dbhdr, sizeof(struct dbheader_t));
-    write(fd, employees, dbhdr->count * sizeof(struct employee_t));
+	lseek(fd, 0, SEEK_SET);
 
-    return STATUS_SUCCESS;
+	write(fd, dbhdr, sizeof(struct dbheader_t));
+
+	int i = 0;
+	for (; i < realcount; i++) {
+		employees[i].hours = htonl(employees[i].hours);
+		write(fd, &employees[i], sizeof(struct employee_t));
+	}
+
+	return STATUS_SUCCESS;
+
 }	
 
 int validate_db_header(int fd, struct dbheader_t **headerOut) {
